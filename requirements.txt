@@ -1,0 +1,10 @@
+# Host (chatbot) dependencies.
+# NOTE: no MCP SDK and no Anthropic SDK are listed here on purpose -
+# the MCP protocol (mcp_client.py) and the Anthropic API calls
+# (llm_client.py) are both implemented by hand on top of plain HTTP /
+# stdio, per the project requirement.
+requests>=2.31
+
+# Official reference MCP server for Git (functionality #4). This is a
+# pre-built server we *use*, not a library our own code imports.
+mcp-server-git>=2025.1.14
