@@ -1,32 +1,4 @@
 #!/usr/bin/env python3
-"""
-server.py - "Offers Recommendation" MCP server
-
-Industry use case (retail / e-commerce): a promotions engine that a
-chatbot can use to ask the customer a few questions (interests, budget,
-preferred category) and, based on the answers, recommend which
-available offer/deal suits them best.
-
-This is a from-scratch, local MCP server implemented with the Python
-standard library ONLY. It speaks JSON-RPC 2.0 over stdio exactly like
-the official reference servers (filesystem, git), but none of the MCP
-protocol handling is imported from a library: the initialize handshake,
-message framing (newline-delimited JSON on stdout/stdin), method
-dispatch and error handling are all written here by hand, per the
-project requirement ("la implementación del protocolo debe realizarse
-de forma manual... sin utilizar librerías o SDKs que implementen MCP").
-
-Run standalone (for manual testing) with:
-    python3 server.py
-and feed it JSON-RPC lines on stdin, e.g.:
-    {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"test","version":"0.0"}}}
-    {"jsonrpc":"2.0","method":"notifications/initialized"}
-    {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
-    {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"match_offers","arguments":{"interests":["musica","tecnologia"],"max_budget":300}}}
-
-See README.md in this folder for the full tool specification and more
-examples.
-"""
 
 from __future__ import annotations
 
@@ -208,9 +180,7 @@ TOOL_IMPLS = {
 }
 
 
-# ---------------------------------------------------------------------
-# Hand-rolled JSON-RPC / MCP plumbing (no SDK)
-# ---------------------------------------------------------------------
+
 def send(message: dict) -> None:
     sys.stdout.write(json.dumps(message) + "\n")
     sys.stdout.flush()

@@ -1,22 +1,3 @@
-"""
-mcp_manager.py
-
-Owns the set of MCP servers the chatbot (host) is connected to:
-
-  * "fs"     -> official Filesystem MCP server (Anthropic reference
-                implementation, @modelcontextprotocol/server-filesystem),
-                spawned with `npx`.
-  * "git"    -> official Git MCP server (Anthropic reference
-                implementation, `mcp-server-git` on PyPI).
-  * "offers" -> our own custom local MCP server (see
-                src/servers/offers_server/server.py), the "caso de uso
-                de industria" required by functionality #5.
-
-Every server is driven through the same hand-written MCPClient
-(mcp_client.py) - the manual JSON-RPC implementation is identical
-regardless of whether the server is an official reference
-implementation or our own.
-"""
 
 from __future__ import annotations
 

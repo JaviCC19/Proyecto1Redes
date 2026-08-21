@@ -1,21 +1,5 @@
 #!/usr/bin/env python3
-"""
-chatbot.py
 
-Entry point for the CC3067 Proyecto 1 chatbot (the "anfitrión" / host
-in MCP terms). Wires together:
-
-  1. LLM connection at the API level          -> llm_client.py
-  2. Session context (multi-turn memory)      -> context.py
-  3. JSON-RPC / MCP interaction logging       -> logger.py
-  4. Official local MCP servers (fs + git)    -> mcp_manager.py
-  5. Custom local MCP server (offers)         -> mcp_manager.py + src/servers/offers_server
-
-Run with:
-    python3 src/host/chatbot.py
-
-See the root README.md for full setup instructions.
-"""
 
 from __future__ import annotations
 

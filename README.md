@@ -1,85 +1,90 @@
 # Proyecto 1 - Uso de un protocolo existente (MCP)
 
-CC3067 Redes, Universidad del Valle de Guatemala. A terminal chatbot
-("host", in MCP terms) that talks to the Anthropic Messages API and
-orchestrates Model Context Protocol (MCP) tools served by local
-processes, using a **hand-written JSON-RPC 2.0 / MCP client and
-server**, with no MCP SDK, no FastMCP, and no Anthropic SDK anywhere in
-the project's own code.
+CC3067 Redes, Universidad del Valle de Guatemala. Un chatbot de
+terminal ("host", en términos de MCP) que se comunica con la API de
+Anthropic Messages y orquesta herramientas del Model Context Protocol
+(MCP) servidas por procesos locales, usando un **cliente y servidor
+JSON-RPC 2.0 / MCP escritos a mano**, sin SDK de MCP, sin FastMCP y sin
+el SDK de Anthropic en ninguna parte del código propio del proyecto.
 
-> Status: this checkpoint implements functionalities **1 through 5** of
-> the assignment (chatbot core + the two official local MCP servers +
-> our own custom local MCP server). The remote deployment, the
-> Wireshark analysis and the final report (functionalities 6-10) are
-> not part of this delivery yet.
+> Estado: este checkpoint implementa las funcionalidades **1 a la 5**
+> del enunciado (núcleo del chatbot + los dos servidores MCP locales
+> oficiales + nuestro propio servidor MCP local personalizado). El
+> despliegue remoto, el análisis con Wireshark y el informe final
+> (funcionalidades 6-10) todavía no forman parte de esta entrega.
 
-## Why "no SDK"
+## Por qué "sin SDK"
 
-The assignment requires the MCP protocol to be implemented manually:
+El enunciado exige que el protocolo MCP se implemente de forma manual:
 "La implementación del protocolo debe realizarse de forma manual, es
 decir, que deben implementarse todo el formato e intercambio de
 mensajes utilizando JSON-RPC, sin utilizar librerías o SDKs que
-implementen MCP, tales como FastMCP". Concretely, in this repo:
+implementen MCP, tales como FastMCP". Concretamente, en este
+repositorio:
 
-- [`src/host/mcp_client.py`](src/host/mcp_client.py) implements the
-  stdio transport (newline-delimited JSON), the `initialize` handshake,
-  request/response correlation and `tools/list` / `tools/call` by hand,
-  using only `subprocess`, `json` and `threading` from the standard
-  library.
+- [`src/host/mcp_client.py`](src/host/mcp_client.py) implementa a mano
+  el transporte por stdio (JSON delimitado por saltos de línea), el
+  handshake de `initialize`, la correlación de solicitudes/respuestas
+  y `tools/list` / `tools/call`, usando únicamente `subprocess`, `json`
+  y `threading` de la librería estándar.
 - [`src/servers/offers_server/server.py`](src/servers/offers_server/server.py)
-  (our own MCP server) implements the server side of that same protocol
-  by hand, with only `sys` and `json`.
-- [`src/host/llm_client.py`](src/host/llm_client.py) talks to the
-  Anthropic Messages API with plain HTTPS (`requests`), not the
-  `anthropic` Python SDK.
+  (nuestro propio servidor MCP) implementa a mano el lado del servidor
+  de ese mismo protocolo, usando únicamente `sys` y `json`.
+- [`src/host/llm_client.py`](src/host/llm_client.py) se comunica con la
+  API de Anthropic Messages mediante HTTPS puro (`requests`), no con el
+  SDK de Python `anthropic`.
 
-The **official** Filesystem and Git MCP servers (functionality #4)
-are pre-built reference servers we *use* as external processes - the
-assignment explicitly asks for them "existentes (oficiales)". Whatever
-they use internally is irrelevant: our client never imports their code,
-it only exchanges JSON-RPC messages with them over stdio, exactly like
-it does with our own custom server.
+Los servidores MCP **oficiales** de Filesystem y Git (funcionalidad #4)
+son servidores de referencia preconstruidos que *usamos* como procesos
+externos - el enunciado explícitamente pide que sean "existentes
+(oficiales)". Lo que usen internamente es irrelevante: nuestro cliente
+nunca importa su código, solo intercambia mensajes JSON-RPC con ellos
+por stdio, exactamente igual que con nuestro propio servidor
+personalizado.
 
-## Architecture
+## Arquitectura
 
 ```
                      ┌───────────────────────────┐
                      │   chatbot.py  (Anfitrión)  │
-                     │  - Anthropic Messages API  │
-                     │  - session context         │
+                     │  - API de Anthropic Messages│
+                     │  - contexto de sesión       │
                      └─────────────┬──────────────┘
-                                   │  MCPClient (hand-written JSON-RPC over stdio)
+                                   │  MCPClient (JSON-RPC escrito a mano sobre stdio)
               ┌────────────────────┼────────────────────┐
               │                    │                     │
      ┌────────▼────────┐ ┌─────────▼────────┐ ┌──────────▼─────────┐
-     │  fs   (official) │ │  git  (official)  │ │ offers  (custom)   │
+     │  fs   (oficial)  │ │  git  (oficial)   │ │ offers  (propio)   │
      │ @modelcontext-   │ │  mcp-server-git   │ │ src/servers/       │
-     │ protocol/server- │ │  (PyPI, spawned   │ │ offers_server      │
-     │ filesystem (npx) │ │  as subprocess)   │ │ (this project)     │
+     │ protocol/server- │ │  (PyPI, lanzado   │ │ offers_server      │
+     │ filesystem (npx) │ │  como subproceso) │ │ (este proyecto)    │
      └──────────────────┘ └───────────────────┘ └─────────────────────┘
 ```
 
-Every JSON-RPC message crossing any of these three connections is
-logged by [`src/host/logger.py`](src/host/logger.py) - printed live to
-the console and appended to `logs/mcp_interactions.log`.
+Todo mensaje JSON-RPC que cruza cualquiera de estas tres conexiones es
+registrado por [`src/host/logger.py`](src/host/logger.py) - impreso en
+vivo en la consola y agregado a `logs/mcp_interactions.log`.
 
-## Features implemented (mapped to the assignment)
+## Funcionalidades implementadas (mapeadas al enunciado)
 
-| # | Functionality | Where |
+| # | Funcionalidad | Dónde |
 |---|----------------|-------|
-| 1 | LLM connection at the API level | `src/host/llm_client.py` |
-| 2 | Multi-turn session context | `src/host/context.py` |
-| 3 | Log of every MCP request/response | `src/host/logger.py` |
-| 4 | Official Filesystem + Git MCP servers | `src/host/mcp_manager.py` |
-| 5 | Custom local MCP server (industry use case: offer/deal recommendation) | `src/servers/offers_server/` (spec in its own [README](src/servers/offers_server/README.md)) |
+| 1 | Conexión al LLM a nivel de API | `src/host/llm_client.py` |
+| 2 | Contexto de sesión multi-turno | `src/host/context.py` |
+| 3 | Registro de cada solicitud/respuesta MCP | `src/host/logger.py` |
+| 4 | Servidores MCP oficiales Filesystem + Git | `src/host/mcp_manager.py` |
+| 5 | Servidor MCP local personalizado (caso de uso industrial: recomendación de ofertas/promociones) | `src/servers/offers_server/` (especificación en su propio [README](src/servers/offers_server/README.md)) |
 
-## Requirements
+## Requisitos
 
 - Python 3.10+
-- Node.js + `npx` (used to run the official Filesystem MCP server on demand - no manual install needed, `npx` fetches it automatically the first time)
-- An Anthropic API key (the course provides $5 in free credits, no card required) - https://console.anthropic.com
+- Node.js + `npx` (usado para ejecutar el servidor MCP oficial de
+  Filesystem bajo demanda - no requiere instalación manual, `npx` lo
+  descarga automáticamente la primera vez)
+- Una API key de Anthropic (el curso otorga $5 en créditos gratuitos,
+  sin necesidad de tarjeta) - https://console.anthropic.com
 
-## Setup
+## Configuración
 
 ```bash
 git clone <this repo>
@@ -91,117 +96,121 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# edit .env and set ANTHROPIC_API_KEY=sk-ant-...
+# edita .env y define ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-## Running the chatbot
+## Ejecutar el chatbot
 
 ```bash
 ./scripts/run_chatbot.sh
-# or directly:
+# o directamente:
 python3 src/host/chatbot.py
 ```
 
-On startup the host spawns and initializes the three MCP servers
-(`offers`, `fs`, `git`), prints the JSON-RPC handshake to the console,
-and drops you into a chat prompt. Type `salir` to quit.
+Al iniciar, el host lanza e inicializa los tres servidores MCP
+(`offers`, `fs`, `git`), imprime el handshake JSON-RPC en la consola,
+y te deja en un prompt de chat. Escribe `salir` para salir.
 
-Two sandboxed folders are created automatically the first time you run
-it (both git-ignored):
+Se crean automáticamente dos carpetas aisladas la primera vez que lo
+ejecutas (ambas ignoradas por git):
 
-- `workspace/` - the only directory the Filesystem MCP server is
-  allowed to touch.
-- `workspace_git/` - the repository the Git MCP server is bound to.
-  It is initialized with a single `git init` the first time (the
-  official `mcp-server-git` package does not expose a `git_init`
-  tool and refuses to start at all if `--repository` does not already
-  point at a valid repo - see the comment in `mcp_manager.py` for
-  details). Every subsequent operation (creating the README, staging
-  it, committing it) goes through MCP.
+- `workspace/` - el único directorio que el servidor MCP de Filesystem
+  tiene permitido tocar.
+- `workspace_git/` - el repositorio al que está vinculado el servidor
+  MCP de Git. Se inicializa con un único `git init` la primera vez (el
+  paquete oficial `mcp-server-git` no expone una herramienta
+  `git_init` y se niega a iniciar si `--repository` no apunta ya a un
+  repositorio válido - ver el comentario en `mcp_manager.py` para más
+  detalles). Cada operación posterior (crear el README, añadirlo,
+  hacer commit) pasa por MCP.
 
-### Demo scenario for functionality #4
+### Escenario de demostración para la funcionalidad #4
 
-Ask the chatbot something like:
+Pídele al chatbot algo como:
 
 > "Crea un archivo README.md en el workspace que diga 'Proyecto 1
 > Redes', agrégalo al repositorio git y haz commit con el mensaje
 > 'Initial commit'."
 
-The model will call `fs__write_file` and then `git__git_add` +
-`git__git_commit`, all visible in the console log and in
+El modelo llamará a `fs__write_file` y luego a `git__git_add` +
+`git__git_commit`, todo visible en el log de consola y en
 `logs/mcp_interactions.log`.
 
-### Demo scenario for functionality #5
+### Escenario de demostración para la funcionalidad #5
 
 > "Hola, ¿tienen alguna promoción interesante?"
 
-The chatbot should ask a couple of clarifying questions (interests,
-budget, preferred category) and then call `offers__match_offers` to
-recommend the best matching deal from the catalog. Full tool spec,
-JSON-RPC examples and more sample conversations are in
+El chatbot debería hacer un par de preguntas aclaratorias (intereses,
+presupuesto, categoría preferida) y luego llamar a
+`offers__match_offers` para recomendar la oferta que mejor coincida
+del catálogo. La especificación completa de la herramienta, ejemplos
+de JSON-RPC y más conversaciones de muestra están en
 [`src/servers/offers_server/README.md`](src/servers/offers_server/README.md).
 
-## Verifying the MCP plumbing without an API key
+## Verificar el funcionamiento de MCP sin una API key
 
 ```bash
 python3 scripts/smoke_test.py
 ```
 
-Starts all three MCP servers, lists their tools and exercises one tool
-call on each (recommend an offer, write+read a file, init/add/commit/
-status a git repo) — useful to confirm the transport works
-independently of the LLM integration.
+Inicia los tres servidores MCP, lista sus herramientas y ejercita una
+llamada de herramienta en cada uno (recomendar una oferta,
+escribir+leer un archivo, init/add/commit/status de un repositorio
+git) — útil para confirmar que el transporte funciona
+independientemente de la integración con el LLM.
 
 ## Logging
 
-Every JSON-RPC request, response and notification is:
+Cada solicitud, respuesta y notificación JSON-RPC es:
 
-- printed to the console as `[MCP][<server>] --> / <-- id=... ...`
-- appended as a structured JSON line to `logs/mcp_interactions.log`
+- impresa en la consola como `[MCP][<server>] --> / <-- id=... ...`
+- agregada como una línea JSON estructurada a
+  `logs/mcp_interactions.log`
 
-## Project layout
+## Estructura del proyecto
 
 ```
 src/
   host/
-    chatbot.py       # entry point / chat loop
-    llm_client.py     # Anthropic Messages API client (plain HTTPS)
-    context.py         # session/context manager
-    logger.py           # JSON-RPC interaction logger
-    mcp_client.py         # hand-written MCP client (JSON-RPC over stdio)
-    mcp_manager.py          # spawns/owns the fs, git and offers servers
-    env_loader.py             # tiny .env reader
+    chatbot.py       # punto de entrada / bucle de chat
+    llm_client.py     # cliente de la API de Anthropic Messages (HTTPS puro)
+    context.py         # gestor de sesión/contexto
+    logger.py           # logger de interacciones JSON-RPC
+    mcp_client.py         # cliente MCP escrito a mano (JSON-RPC sobre stdio)
+    mcp_manager.py          # lanza y administra los servidores fs, git y offers
+    env_loader.py             # lector minimalista de .env
   servers/
     offers_server/
-      server.py      # our own MCP server (hand-written, no SDK)
-      offers_data.py  # sample offer/deal catalog
-      README.md        # protocol spec, tools, usage examples
+      server.py      # nuestro propio servidor MCP (escrito a mano, sin SDK)
+      offers_data.py  # catálogo de ofertas/promociones de ejemplo
+      README.md        # especificación del protocolo, herramientas, ejemplos de uso
 scripts/
   run_chatbot.sh
   smoke_test.py
-logs/                 # created at runtime (git-ignored except this folder)
+logs/                 # creado en tiempo de ejecución (ignorado por git salvo esta carpeta)
 ```
 
-## Roadmap (not part of this delivery)
+## Roadmap (no forma parte de esta entrega)
 
-- [ ] Functionality 6: deploy the offers MCP server remotely (Cloud
-      Run / Cloudflare) and have the chatbot use it exactly like the
-      local one.
-- [ ] Functionality 7: Wireshark capture and JSON-RPC message
-      classification (sync / request / response) for the remote
-      transport.
-- [ ] Functionalities 8-10: written report (spec, Wireshark analysis
-      across OSI/TCP-IP layers, conclusions).
-- [ ] Optional UI extra credit.
+- [ ] Funcionalidad 6: desplegar el servidor MCP de offers de forma
+      remota (Cloud Run / Cloudflare) y hacer que el chatbot lo use
+      exactamente igual que el local.
+- [ ] Funcionalidad 7: captura con Wireshark y clasificación de
+      mensajes JSON-RPC (sync / request / response) para el transporte
+      remoto.
+- [ ] Funcionalidades 8-10: informe escrito (especificación, análisis
+      de Wireshark a través de las capas OSI/TCP-IP, conclusiones).
+- [ ] Extra opcional de UI.
 
-## Academic integrity note
+## Nota de integridad académica
 
-This project's own code (`src/host/*.py`,
-`src/servers/offers_server/*.py`) implements the MCP JSON-RPC protocol
-from scratch, referencing only the public specification
-(https://modelcontextprotocol.io/specification/2025-11-25) and the
-JSON-RPC 2.0 spec (https://www.jsonrpc.org/specification) - not any
-MCP SDK source code. The official Filesystem and Git servers used in
-functionality #4 are third-party reference implementations, used as
-required by the assignment, and are not part of "our" protocol
-implementation.
+El código propio de este proyecto (`src/host/*.py`,
+`src/servers/offers_server/*.py`) implementa el protocolo JSON-RPC de
+MCP desde cero, referenciando únicamente la especificación pública
+(https://modelcontextprotocol.io/specification/2025-11-25) y la
+especificación de JSON-RPC 2.0
+(https://www.jsonrpc.org/specification) - no el código fuente de
+ningún SDK de MCP. Los servidores oficiales de Filesystem y Git
+usados en la funcionalidad #4 son implementaciones de referencia de
+terceros, usadas según lo requerido por el enunciado, y no forman
+parte de "nuestra" implementación del protocolo.
