@@ -26,6 +26,8 @@ import sys
 import threading
 from datetime import datetime, timezone
 
+import ui
+
 _LOCK = threading.Lock()
 
 
@@ -79,4 +81,11 @@ class InteractionLogger:
         else:
             summary = ""
         msg_id = message.get("id", "")
-        return f"[MCP][{server_alias}] {arrow} id={msg_id} {summary}"
+        line = f"[MCP][{server_alias}] {arrow} id={msg_id} {summary}"
+        # Color by direction: outgoing requests (yellow, "in flight"),
+        # incoming responses (green, "resolved"), errors always red
+        # regardless of direction so failures stand out at a glance.
+        if "error" in message:
+            return ui.colorize(line, ui.Color.RED, ui.Color.BOLD)
+        color = {"request": ui.Color.YELLOW, "response": ui.Color.GREEN}.get(direction, ui.Color.DIM)
+        return ui.colorize(line, color)

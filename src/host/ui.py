@@ -48,6 +48,12 @@ def _c(text: str, *codes: str) -> str:
     return "".join(codes) + text + Color.RESET
 
 
+def colorize(text: str, *codes: str) -> str:
+    """Public entry point for _c(), for callers outside this module
+    (e.g. logger.py coloring its console-only interaction log)."""
+    return _c(text, *codes)
+
+
 def banner(title: str, subtitle: str = "") -> str:
     width = max(len(title), len(subtitle)) + 4
     top = "┌" + "─" * width + "┐"
