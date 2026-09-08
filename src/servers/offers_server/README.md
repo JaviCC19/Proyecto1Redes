@@ -1,11 +1,12 @@
 # Offers Recommendation MCP Server
 
-Custom, from-scratch **local** MCP server implemented for functionality
-**#5** of Proyecto 1 (CC3067 Redes, UVG). It does **not** use the MCP
-SDK, FastMCP, or any similar library: the JSON-RPC 2.0 message framing,
-the `initialize` handshake and the `tools/list` / `tools/call` dispatch
-are all hand-written in [`server.py`](./server.py) using only the
-Python standard library (`sys`, `json`).
+Custom, from-scratch MCP server implemented for functionalities **#5**
+(local) and **#6** (the same server, remote) of Proyecto 1 (CC3067
+Redes, UVG). It does **not** use the MCP SDK, FastMCP, or any similar
+library: the JSON-RPC 2.0 message framing, the `initialize` handshake
+and the `tools/list` / `tools/call` dispatch are all hand-written in
+[`server.py`](./server.py) using only the Python standard library
+(`sys`, `json`), and shared by both transports below.
 
 ## Industry use case
 
@@ -17,12 +18,59 @@ answers.
 
 ## Transport
 
+Two transports expose the exact same tools and the exact same
+`handle_message()` dispatch logic (`server.py`); only the framing
+around the JSON-RPC messages changes.
+
+### Local: stdio (functionality #5)
+
 - **Type:** stdio (the server is spawned as a child process; JSON-RPC
   messages are exchanged over its stdin/stdout).
 - **Framing:** one JSON object per line (newline-delimited JSON), UTF-8
   encoded. No `Content-Length` headers.
 - All server-side logging goes to **stderr**, never to stdout, so stdout
   stays reserved exclusively for JSON-RPC messages.
+
+### Remote: HTTP (functionality #6)
+
+Implemented in [`http_server.py`](./http_server.py) with only
+`http.server` from the standard library (no Flask/FastAPI, no MCP
+SDK) - a simplified version of the MCP "Streamable HTTP" transport:
+one JSON-RPC message POSTed, one JSON-RPC message back in the response
+body (we don't implement the SSE upgrade / server push path, since
+this project's client only ever does one request/response at a time).
+
+| Endpoint      | Method | Body                     | Response                                                        |
+|---------------|--------|--------------------------|-------------------------------------------------------------------|
+| `/mcp`        | POST   | one JSON-RPC 2.0 message | `200` + JSON-RPC response for a request; `202` + empty body for a notification |
+| `/health`     | GET    | -                        | `200 {"status": "ok"}` (used by Cloud Run health checks)          |
+
+Auth: if the `MCP_AUTH_TOKEN` environment variable is set on the
+server, every `/mcp` request must carry `Authorization: Bearer
+<token>`, or the server replies `401`. Left unset for local testing.
+
+Deploying it (e.g. to Google Cloud Run):
+
+```bash
+cd src/servers/offers_server
+docker build -t offers-mcp .
+docker run -p 8080:8080 -e MCP_AUTH_TOKEN=change-me offers-mcp   # test locally first
+
+# then, once you have gcloud configured:
+../../../scripts/deploy_offers_cloud_run.sh
+```
+
+Point the chatbot at the deployed URL by setting, in `.env`:
+
+```bash
+OFFERS_REMOTE_URL=https://<your-service>-xxxxxxxxxx.a.run.app
+OFFERS_AUTH_TOKEN=change-me
+```
+
+`src/host/mcp_manager.py` picks the remote client (`MCPHttpClient` in
+[`src/host/mcp_http_client.py`](../../host/mcp_http_client.py)) instead
+of spawning the local subprocess whenever `OFFERS_REMOTE_URL` is set -
+everything else (tool schema, chatbot prompt, logging) stays identical.
 
 ## Protocol version
 
@@ -31,7 +79,7 @@ answers.
 
 ## How to run it
 
-Standalone, for manual testing:
+Standalone, for manual testing (stdio):
 
 ```bash
 cd src/servers/offers_server
@@ -39,9 +87,21 @@ python3 server.py
 ```
 
 Then type/paste JSON-RPC requests (one per line) into stdin - see
-"Examples" below. In the actual project it is spawned automatically by
-the chatbot host (see [`src/host/mcp_manager.py`](../../host/mcp_manager.py)),
-exactly like the official Filesystem and Git MCP servers.
+"Examples" below.
+
+Standalone, over HTTP:
+
+```bash
+cd src/servers/offers_server
+PORT=8080 python3 http_server.py
+curl -X POST http://localhost:8080/mcp -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+In the actual project the server is started automatically by the
+chatbot host (see [`src/host/mcp_manager.py`](../../host/mcp_manager.py)),
+exactly like the official Filesystem and Git MCP servers - locally over
+stdio by default, or remotely over HTTP when `OFFERS_REMOTE_URL` is
+configured.
 
 ## Tools exposed
 
