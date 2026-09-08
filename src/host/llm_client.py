@@ -23,7 +23,10 @@ import requests
 
 API_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_VERSION = "2023-06-01"
-DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
+# Haiku: fast/cheap, well within the course's $5 free credits even with a
+# long back-and-forth conversation. Overridable via the ANTHROPIC_MODEL
+# env var without touching code (e.g. to try a larger model).
+DEFAULT_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 
 
 class LLMError(Exception):
