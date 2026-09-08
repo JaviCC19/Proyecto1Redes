@@ -9,6 +9,7 @@ from typing import Optional
 
 from logger import InteractionLogger
 from mcp_client import MCPClient
+from mcp_http_client import MCPHttpClient
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 SRC_DIR = os.path.dirname(THIS_DIR)
@@ -20,7 +21,7 @@ class MCPManager:
         self.logger = logger
         self.workspace_dir = workspace_dir
         self.git_repo_dir = git_repo_dir
-        self.clients: dict[str, MCPClient] = {}
+        self.clients: dict[str, "MCPClient | MCPHttpClient"] = {}
 
     def _npx_available(self) -> bool:
         return shutil.which("npx") is not None
@@ -45,7 +46,7 @@ class MCPManager:
     def start_all(self, include_fs: bool = True, include_git: bool = True,
                   include_offers: bool = True) -> None:
         if include_offers:
-            self._start("offers", [sys.executable, OFFERS_SERVER_PATH])
+            self._start_offers()
 
         if include_fs:
             if self._npx_available():
@@ -71,6 +72,29 @@ class MCPManager:
         client.initialize()
         client.list_tools()
         self.clients[alias] = client
+
+    def _start_offers(self) -> None:
+        """Functionality #5 vs #6: by default the offers MCP server runs
+        as a local subprocess over stdio (functionality #5). Setting
+        OFFERS_REMOTE_URL in the environment (e.g. to a Cloud Run URL,
+        see src/servers/offers_server/Dockerfile) switches the host to
+        talk to that same server deployed remotely over HTTP instead -
+        functionality #6 - without changing anything else: the chatbot,
+        the tool schema and the logging are identical either way."""
+        remote_url = os.environ.get("OFFERS_REMOTE_URL", "").strip()
+        if remote_url:
+            client = MCPHttpClient(
+                alias="offers",
+                base_url=remote_url,
+                logger=self.logger,
+                auth_token=os.environ.get("OFFERS_AUTH_TOKEN", "").strip() or None,
+            )
+            client.start()
+            client.initialize()
+            client.list_tools()
+            self.clients["offers"] = client
+        else:
+            self._start("offers", [sys.executable, OFFERS_SERVER_PATH])
 
     def all_tools_for_llm(self) -> list[dict]:
         """Flattens every connected server's tools into Anthropic's tool
