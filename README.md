@@ -7,11 +7,12 @@ Anthropic Messages y orquesta herramientas del Model Context Protocol
 JSON-RPC 2.0 / MCP escritos a mano**, sin SDK de MCP, sin FastMCP y sin
 el SDK de Anthropic en ninguna parte del código propio del proyecto.
 
-> Estado: este checkpoint implementa las funcionalidades **1 a la 5**
+> Estado: este checkpoint implementa las funcionalidades **1 a la 6**
 > del enunciado (núcleo del chatbot + los dos servidores MCP locales
-> oficiales + nuestro propio servidor MCP local personalizado). El
-> despliegue remoto, el análisis con Wireshark y el informe final
-> (funcionalidades 6-10) todavía no forman parte de esta entrega.
+> oficiales + nuestro propio servidor MCP, tanto local como remoto). El
+> análisis con Wireshark y el informe final (funcionalidades 7-10)
+> todavía no forman parte de esta entrega: requieren una captura de red
+> real sobre un despliegue en la nube ya activo (ver "Roadmap" abajo).
 
 ## Por qué "sin SDK"
 
@@ -50,20 +51,27 @@ personalizado.
                      │  - API de Anthropic Messages│
                      │  - contexto de sesión       │
                      └─────────────┬──────────────┘
-                                   │  MCPClient (JSON-RPC escrito a mano sobre stdio)
-              ┌────────────────────┼────────────────────┐
-              │                    │                     │
-     ┌────────▼────────┐ ┌─────────▼────────┐ ┌──────────▼─────────┐
-     │  fs   (oficial)  │ │  git  (oficial)   │ │ offers  (propio)   │
-     │ @modelcontext-   │ │  mcp-server-git   │ │ src/servers/       │
-     │ protocol/server- │ │  (PyPI, lanzado   │ │ offers_server      │
-     │ filesystem (npx) │ │  como subproceso) │ │ (este proyecto)    │
-     └──────────────────┘ └───────────────────┘ └─────────────────────┘
+                                   │  MCPClient / MCPHttpClient (JSON-RPC escrito a mano)
+              ┌────────────────────┼────────────────────┬──────────────────────┐
+              │ stdio               │ stdio                │ stdio                 │ HTTPS
+     ┌────────▼────────┐ ┌─────────▼────────┐ ┌──────────▼─────────┐ ┌───────────▼────────────┐
+     │  fs   (oficial)  │ │  git  (oficial)   │ │ offers  (propio,    │ │ offers  (propio,        │
+     │ @modelcontext-   │ │  mcp-server-git   │ │ local, subproceso)  │ │ remoto, Cloud Run -     │
+     │ protocol/server- │ │  (PyPI, lanzado   │ │ src/servers/        │ │ funcionalidad #6,       │
+     │ filesystem (npx) │ │  como subproceso) │ │ offers_server        │ │ activo solo si          │
+     │                  │ │                   │ │                     │ │ OFFERS_REMOTE_URL está  │
+     │                  │ │                   │ │                     │ │ configurado             │
+     └──────────────────┘ └───────────────────┘ └─────────────────────┘ └─────────────────────────┘
 ```
 
-Todo mensaje JSON-RPC que cruza cualquiera de estas tres conexiones es
+Todo mensaje JSON-RPC que cruza cualquiera de estas conexiones es
 registrado por [`src/host/logger.py`](src/host/logger.py) - impreso en
-vivo en la consola y agregado a `logs/mcp_interactions.log`.
+vivo en la consola y agregado a `logs/mcp_interactions.log`. El
+servidor `offers` corre localmente por defecto (funcionalidad #5); si
+`OFFERS_REMOTE_URL` está configurado en `.env`, el host habla en su
+lugar por HTTPS con exactamente el mismo servidor desplegado en la nube
+(funcionalidad #6) - ver
+[`src/servers/offers_server/README.md`](src/servers/offers_server/README.md#transport).
 
 ## Funcionalidades implementadas (mapeadas al enunciado)
 
@@ -74,6 +82,7 @@ vivo en la consola y agregado a `logs/mcp_interactions.log`.
 | 3 | Registro de cada solicitud/respuesta MCP | `src/host/logger.py` |
 | 4 | Servidores MCP oficiales Filesystem + Git | `src/host/mcp_manager.py` |
 | 5 | Servidor MCP local personalizado (caso de uso industrial: recomendación de ofertas/promociones) | `src/servers/offers_server/` (especificación en su propio [README](src/servers/offers_server/README.md)) |
+| 6 | El mismo servidor MCP, desplegado de forma remota (HTTP) | `src/servers/offers_server/http_server.py` + `Dockerfile`, cliente `src/host/mcp_http_client.py`, despliegue con `scripts/deploy_offers_cloud_run.sh` |
 
 ## Requisitos
 
@@ -83,6 +92,10 @@ vivo en la consola y agregado a `logs/mcp_interactions.log`.
   descarga automáticamente la primera vez)
 - Una API key de Anthropic (el curso otorga $5 en créditos gratuitos,
   sin necesidad de tarjeta) - https://console.anthropic.com
+- Opcional, solo para la funcionalidad #6 (desplegar/probar el
+  servidor remoto): Docker y/o `gcloud` CLI. No se necesitan para
+  correr el chatbot con el servidor de ofertas local (funcionalidad
+  #5, comportamiento por defecto).
 
 ## Configuración
 
@@ -147,6 +160,24 @@ del catálogo. La especificación completa de la herramienta, ejemplos
 de JSON-RPC y más conversaciones de muestra están en
 [`src/servers/offers_server/README.md`](src/servers/offers_server/README.md).
 
+### Escenario de demostración para la funcionalidad #6
+
+1. Despliega el servidor de ofertas a Cloud Run (o pruébalo primero en
+   local con Docker) - ver la sección "Remote: HTTP" en
+   [`src/servers/offers_server/README.md`](src/servers/offers_server/README.md#transport).
+2. En `.env`, define `OFFERS_REMOTE_URL=<url del servicio desplegado>`
+   (y `OFFERS_AUTH_TOKEN` si lo configuraste con auth).
+3. Corre el chatbot normalmente (`./scripts/run_chatbot.sh`) y pide una
+   promoción, igual que en el escenario #5. El log de consola mostrará
+   las mismas solicitudes/respuestas JSON-RPC, pero ahora viajando por
+   HTTPS hacia el servidor remoto en vez de por stdio hacia un
+   subproceso local.
+4. `python3 scripts/smoke_test_remote.py` verifica el transporte HTTP
+   de punta a punta sin necesitar una API key de Anthropic (funciona
+   tanto contra un servidor local levantado por el propio script, como
+   contra la URL real ya desplegada si `OFFERS_REMOTE_URL` está
+   definido).
+
 ## Verificar el funcionamiento de MCP sin una API key
 
 ```bash
@@ -177,27 +208,30 @@ src/
     context.py         # gestor de sesión/contexto
     logger.py           # logger de interacciones JSON-RPC
     mcp_client.py         # cliente MCP escrito a mano (JSON-RPC sobre stdio)
-    mcp_manager.py          # lanza y administra los servidores fs, git y offers
+    mcp_http_client.py      # cliente MCP escrito a mano (JSON-RPC sobre HTTPS, funcionalidad #6)
+    mcp_manager.py          # lanza y administra los servidores fs, git y offers (local o remoto)
     env_loader.py             # lector minimalista de .env
   servers/
     offers_server/
       server.py      # nuestro propio servidor MCP (escrito a mano, sin SDK)
+      http_server.py   # transporte HTTP del mismo servidor (funcionalidad #6)
       offers_data.py  # catálogo de ofertas/promociones de ejemplo
-      README.md        # especificación del protocolo, herramientas, ejemplos de uso
+      Dockerfile         # imagen para desplegar http_server.py en la nube
+      README.md            # especificación del protocolo, herramientas, ejemplos de uso
 scripts/
   run_chatbot.sh
   smoke_test.py
+  smoke_test_remote.py  # verifica el transporte HTTP de punta a punta
+  deploy_offers_cloud_run.sh  # despliega http_server.py a Google Cloud Run
 logs/                 # creado en tiempo de ejecución (ignorado por git salvo esta carpeta)
 ```
 
 ## Roadmap (no forma parte de esta entrega)
 
-- [ ] Funcionalidad 6: desplegar el servidor MCP de offers de forma
-      remota (Cloud Run / Cloudflare) y hacer que el chatbot lo use
-      exactamente igual que el local.
 - [ ] Funcionalidad 7: captura con Wireshark y clasificación de
       mensajes JSON-RPC (sync / request / response) para el transporte
-      remoto.
+      remoto, contra el servidor de offers ya desplegado (funcionalidad
+      #6).
 - [ ] Funcionalidades 8-10: informe escrito (especificación, análisis
       de Wireshark a través de las capas OSI/TCP-IP, conclusiones).
 - [ ] Extra opcional de UI.
