@@ -56,14 +56,51 @@ class AnthropicClient:
         body: dict[str, Any] = {
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "messages": messages,
+            "messages": _with_cache_breakpoint(messages),
         }
         if system:
-            body["system"] = system
+            # Prompt caching (https://docs.claude.com/en/docs/build-with-claude/
+            # prompt-caching): the system prompt is identical on every turn of
+            # the tool-use loop, so marking it as an ephemeral cache breakpoint
+            # means Anthropic only pays to *process* it once per ~5 minutes
+            # instead of on every single request in the conversation.
+            body["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
         if tools:
+            # Same idea for the tool schema: it's resent unchanged on every
+            # turn too (see mcp_manager.all_tools_for_llm). Marking the last
+            # tool definition as a cache breakpoint caches the whole list.
+            tools = [dict(t) for t in tools]
+            tools[-1] = {**tools[-1], "cache_control": {"type": "ephemeral"}}
             body["tools"] = tools
 
         resp = requests.post(API_URL, headers=headers, data=json.dumps(body), timeout=60)
         if resp.status_code != 200:
             raise LLMError(f"Anthropic API error {resp.status_code}: {resp.text}")
         return resp.json()
+
+
+def _with_cache_breakpoint(messages: list[dict]) -> list[dict]:
+    """Returns a shallow copy of `messages` with an ephemeral prompt-cache
+    breakpoint on the last content block of the last message.
+
+    Every turn of the agent loop resends the *entire* conversation so far
+    (the Messages API is stateless - see context.py), so without caching,
+    a long conversation gets fully reprocessed as fresh input tokens on
+    every single turn. Marking the newest message as a cache breakpoint
+    lets Anthropic reuse the cached prefix from the previous turn instead
+    of reprocessing everything that came before it - the incremental cost
+    of each turn becomes roughly proportional to what's new, not to the
+    whole history. Does not mutate the caller's message list or its
+    session-persisted originals.
+    """
+    if not messages:
+        return messages
+    result = list(messages)
+    last = dict(result[-1])
+    content = last["content"]
+    content = [{"type": "text", "text": content}] if isinstance(content, str) else [dict(b) for b in content]
+    if content:
+        content[-1] = {**content[-1], "cache_control": {"type": "ephemeral"}}
+    last["content"] = content
+    result[-1] = last
+    return result
