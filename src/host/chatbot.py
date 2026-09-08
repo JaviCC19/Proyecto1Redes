@@ -11,6 +11,7 @@ from env_loader import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"))
 
+import ui
 from context import SessionContext
 from llm_client import AnthropicClient, LLMError
 from logger import InteractionLogger
@@ -54,11 +55,12 @@ def run_agent_turn(llm: AnthropicClient, session: SessionContext, mcp_manager: M
     tools = mcp_manager.all_tools_for_llm()
 
     while True:
-        response = llm.create_message(
-            messages=session.as_api_messages(),
-            system=SYSTEM_PROMPT,
-            tools=tools,
-        )
+        with ui.Spinner("Pensando"):
+            response = llm.create_message(
+                messages=session.as_api_messages(),
+                system=SYSTEM_PROMPT,
+                tools=tools,
+            )
         content = response.get("content", [])
         stop_reason = response.get("stop_reason")
 
@@ -74,6 +76,8 @@ def run_agent_turn(llm: AnthropicClient, session: SessionContext, mcp_manager: M
             tool_name = block["name"]
             tool_input = block.get("input", {})
             tool_use_id = block["id"]
+            alias, _, bare_name = tool_name.partition("__")
+            print(ui.tool_call_line(alias, bare_name or tool_name, tool_input))
             try:
                 mcp_result = mcp_manager.call_tool(tool_name, tool_input)
                 result_text = json.dumps(mcp_result, ensure_ascii=False)
@@ -98,21 +102,23 @@ def main() -> None:
     try:
         llm = AnthropicClient()
     except LLMError as exc:
-        print(f"[error] {exc}", file=sys.stderr)
+        print(ui.error(str(exc)), file=sys.stderr)
         sys.exit(1)
 
     mcp_manager = MCPManager(logger=logger, workspace_dir=WORKSPACE_DIR, git_repo_dir=GIT_REPO_DIR)
-    print("Iniciando servidores MCP (filesystem, git, offers)...", file=sys.stderr)
+    print(ui.system("Iniciando servidores MCP (filesystem, git, offers)..."), file=sys.stderr)
     mcp_manager.start_all()
-    print(f"Listo. {len(mcp_manager.all_tools_for_llm())} herramientas disponibles.\n", file=sys.stderr)
+    tool_count = len(mcp_manager.all_tools_for_llm())
+    print(ui.success(f"{tool_count} herramientas disponibles.\n"), file=sys.stderr)
 
     session = SessionContext(persist_dir=os.path.join(LOGS_DIR, "sessions"))
 
-    print("Chatbot CC3067 - Proyecto 1 (escribe 'salir' para terminar)\n")
+    print(ui.banner("Chatbot CC3067 - Proyecto 1", "escribe 'salir' para terminar"))
+    print()
     try:
         while True:
             try:
-                user_input = input("Tú: ").strip()
+                user_input = input(ui.user_prompt()).strip()
             except EOFError:
                 break
             if not user_input:
@@ -124,9 +130,9 @@ def main() -> None:
             try:
                 reply = run_agent_turn(llm, session, mcp_manager)
             except LLMError as exc:
-                print(f"[error] {exc}")
+                print(ui.error(str(exc)))
                 continue
-            print(f"Bot: {reply}\n")
+            print(f"{ui.bot_label()}{reply}\n")
     finally:
         mcp_manager.close_all()
 
