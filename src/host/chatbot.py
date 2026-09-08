@@ -18,18 +18,31 @@ from logger import InteractionLogger
 from mcp_manager import MCPManager
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-WORKSPACE_DIR = os.path.join(PROJECT_ROOT, "workspace")   # sandbox for the Filesystem server
-GIT_REPO_DIR = os.path.join(PROJECT_ROOT, "workspace_git")  # sandbox repo for the Git server
+# Filesystem and Git point at the SAME directory on purpose: they used to be
+# separate ("workspace" / "workspace_git"), which meant a file the model
+# wrote via fs__write_file lived in a directory the git__ tools never saw,
+# so "create a README and commit it" silently committed whatever stale file
+# already existed in the git sandbox instead of the one just written. One
+# shared directory is both the Filesystem server's allowed root and the Git
+# server's repository, so a write is immediately visible to git add/commit.
+WORKSPACE_DIR = os.path.join(PROJECT_ROOT, "workspace")
+GIT_REPO_DIR = WORKSPACE_DIR
 LOGS_DIR = os.path.join(PROJECT_ROOT, "logs")
 
-SYSTEM_PROMPT = """Eres un asistente conversacional (chatbot) construido para el Proyecto 1 de
+SYSTEM_PROMPT = f"""Eres un asistente conversacional (chatbot) construido para el Proyecto 1 de
 CC3067 Redes (UVG). Puedes responder preguntas generales, y además tienes acceso a herramientas
 (tools) expuestas por distintos servidores MCP:
 
 - Herramientas con prefijo "fs__": operan sobre el sistema de archivos local (servidor oficial
-  Filesystem MCP), dentro de un directorio de trabajo controlado.
+  Filesystem MCP), dentro de un directorio de trabajo controlado ubicado en "{WORKSPACE_DIR}".
+  Usa esa ruta directamente para el parámetro "path" (o como prefijo de la ruta) - nunca le
+  preguntes al usuario por una ruta, ese directorio ya está preconfigurado para este proyecto.
 - Herramientas con prefijo "git__": operan sobre un repositorio git local (servidor oficial Git
-  MCP).
+  MCP) ya inicializado en ese MISMO directorio, "{GIT_REPO_DIR}" (es a propósito el mismo que el
+  de fs__, así un archivo recién escrito con fs__write_file ya está ahí para que git__ lo agregue
+  y le haga commit). Usa esa ruta como valor de "repo_path" en cada llamada (git__git_add,
+  git__git_commit, git__git_status, etc.) - nunca le preguntes al usuario por la ruta de un
+  repositorio, siempre es este.
 - Herramientas con prefijo "offers__": tu propio servidor MCP de recomendación de ofertas/
   promociones (caso de uso de industria: retail/e-commerce). Úsalo cuando el usuario pregunte por
   descuentos, promociones u ofertas. Primero hazle un par de preguntas cortas sobre sus intereses,
