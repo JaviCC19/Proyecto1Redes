@@ -207,6 +207,71 @@ OFFERS: list[dict] = [
         "valid_until": "2026-12-31",
         "description": "Suscripción de 3 meses a plataforma de clases de idiomas en vivo.",
     },
+    {
+        "id": "OF-017",
+        "title": "35% de descuento en teclados mecánicos",
+        "category": "tecnologia",
+        "tags": ["teclado", "accesorios", "gaming", "tecnologia", "oficina"],
+        "discount_percent": 35,
+        "price_original": 350.0,
+        "price_final": 227.5,
+        "min_purchase": None,
+        "valid_until": "2026-11-20",
+        "description": "Teclados mecánicos retroiluminados, switches intercambiables, ideal "
+                        "para gaming o para escribir/programar todo el día.",
+    },
+    {
+        "id": "OF-018",
+        "title": "30% de descuento en mouse inalámbricos",
+        "category": "tecnologia",
+        "tags": ["mouse", "accesorios", "tecnologia", "oficina", "gaming"],
+        "discount_percent": 30,
+        "price_original": 180.0,
+        "price_final": 126.0,
+        "min_purchase": None,
+        "valid_until": "2026-11-20",
+        "description": "Mouse inalámbricos ergonómicos, incluye opciones silenciosas y "
+                        "de alta precisión para gaming.",
+    },
+    {
+        "id": "OF-019",
+        "title": "20% de descuento en monitores gaming/oficina",
+        "category": "tecnologia",
+        "tags": ["monitor", "pantalla", "tecnologia", "oficina", "gaming"],
+        "discount_percent": 20,
+        "price_original": 1400.0,
+        "price_final": 1120.0,
+        "min_purchase": None,
+        "valid_until": "2026-12-15",
+        "description": "Monitores de 24-27 pulgadas, alta tasa de refresco, ideales para "
+                        "trabajo o gaming.",
+    },
+    {
+        "id": "OF-020",
+        "title": "25% de descuento en audífonos con micrófono para gaming",
+        "category": "tecnologia",
+        "tags": ["audifonos", "gaming", "microfono", "accesorios", "tecnologia"],
+        "discount_percent": 25,
+        "price_original": 300.0,
+        "price_final": 225.0,
+        "min_purchase": None,
+        "valid_until": "2026-11-30",
+        "description": "Diadema con micrófono desmontable y sonido envolvente, pensada "
+                        "para gaming y videollamadas.",
+    },
+    {
+        "id": "OF-021",
+        "title": "15% de descuento en power banks y cargadores rápidos",
+        "category": "tecnologia",
+        "tags": ["cargador", "bateria", "accesorios", "tecnologia", "viajes"],
+        "discount_percent": 15,
+        "price_original": 220.0,
+        "price_final": 187.0,
+        "min_purchase": None,
+        "valid_until": "2026-10-25",
+        "description": "Power banks de alta capacidad y cargadores de carga rápida, "
+                        "compatibles con USB-C.",
+    },
 ]
 
 # Simulated "claims" storage (kept only in memory for the lifetime of the
