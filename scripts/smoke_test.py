@@ -21,8 +21,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def main():
     logger = InteractionLogger(log_dir=os.path.join(ROOT, "logs"), echo_to_console=False)
-    mgr = MCPManager(logger=logger, workspace_dir=os.path.join(ROOT, "workspace"),
-                      git_repo_dir=os.path.join(ROOT, "workspace_git"))
+    # fs and git point at the SAME directory on purpose (see chatbot.py's
+    # WORKSPACE_DIR/GIT_REPO_DIR comment): a file written via fs__write_file
+    # must be visible to git__git_add/git__git_commit in the same run.
+    sandbox_dir = os.path.join(ROOT, "workspace")
+    mgr = MCPManager(logger=logger, workspace_dir=sandbox_dir, git_repo_dir=sandbox_dir)
     mgr.start_all()
 
     print(f"Connected servers: {list(mgr.clients.keys())}")
@@ -57,9 +60,11 @@ def main():
         status_tool = next((t["name"] for t in mgr.clients["git"].tools if t["name"] == "git_status"), None)
         if init_tool:
             print(mgr.call_tool(f"git__{init_tool}", {"repo_path": mgr.git_repo_dir}))
-        readme_path = os.path.join(mgr.git_repo_dir, "README.md")
-        with open(readme_path, "w") as fh:
-            fh.write("# Demo repo created via MCP\n")
+        if "fs" not in mgr.clients:
+            # fs server unavailable (e.g. npx missing) - write directly so
+            # there's still something for git to add/commit below.
+            with open(os.path.join(mgr.git_repo_dir, "README.md"), "w") as fh:
+                fh.write("# Demo repo created via MCP (fs server unavailable)\n")
         if add_tool:
             print(mgr.call_tool(f"git__{add_tool}", {"repo_path": mgr.git_repo_dir, "files": ["README.md"]}))
         if commit_tool:
