@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any
+from typing import Any, Optional
 
 from offers_data import OFFERS, CLAIMS
 
@@ -186,59 +186,72 @@ def send(message: dict) -> None:
     sys.stdout.flush()
 
 
-def send_result(msg_id, result: dict) -> None:
-    send({"jsonrpc": "2.0", "id": msg_id, "result": result})
+def build_response(msg_id, result: dict) -> dict:
+    return {"jsonrpc": "2.0", "id": msg_id, "result": result}
 
 
-def send_error(msg_id, code: int, message: str) -> None:
-    send({"jsonrpc": "2.0", "id": msg_id, "error": {"code": code, "message": message}})
+def build_error(msg_id, code: int, message: str) -> dict:
+    return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": code, "message": message}}
 
 
-def handle_initialize(msg_id, params: dict) -> None:
-    send_result(msg_id, {
-        "protocolVersion": PROTOCOL_VERSION,
-        "capabilities": {"tools": {}},
-        "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
-    })
-
-
-def handle_tools_list(msg_id, params: dict) -> None:
-    send_result(msg_id, {"tools": TOOLS})
-
-
-def handle_tools_call(msg_id, params: dict) -> None:
-    name = params.get("name")
-    arguments = params.get("arguments") or {}
+def _dispatch(name: str, arguments: dict) -> dict:
+    """Runs one tool implementation and returns the MCP 'tools/call' result
+    shape (content blocks + isError), without touching any transport."""
     impl = TOOL_IMPLS.get(name)
     if impl is None:
-        send_error(msg_id, -32601, f"Unknown tool: {name}")
-        return
+        raise KeyError(name)
     try:
         result = impl(arguments)
-        send_result(msg_id, {
+        return {
             "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}],
             "isError": False,
-        })
+        }
     except Exception as exc:  # noqa: BLE001 - tool errors are reported as MCP errors, not crashes
-        send_result(msg_id, {
-            "content": [{"type": "text", "text": str(exc)}],
-            "isError": True,
+        return {"content": [{"type": "text", "text": str(exc)}], "isError": True}
+
+
+def handle_message(message: dict) -> Optional[dict]:
+    """Transport-agnostic core of the server: given one parsed JSON-RPC
+    request/notification object, returns the JSON-RPC response object to
+    send back, or None if the message was a notification (no response
+    expected) or malformed. Used by both the stdio main loop (functionality
+    #5, local server) and the HTTP transport (functionality #6, remote
+    server) so the protocol logic itself is implemented exactly once."""
+    method = message.get("method")
+    msg_id = message.get("id")
+    params = message.get("params") or {}
+
+    if method is None:
+        return None
+
+    if msg_id is None:
+        # Notification (e.g. notifications/initialized): no response.
+        return None
+
+    if method == "initialize":
+        return build_response(msg_id, {
+            "protocolVersion": PROTOCOL_VERSION,
+            "capabilities": {"tools": {}},
+            "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
         })
+    if method == "tools/list":
+        return build_response(msg_id, {"tools": TOOLS})
+    if method == "tools/call":
+        name = params.get("name")
+        arguments = params.get("arguments") or {}
+        try:
+            return build_response(msg_id, _dispatch(name, arguments))
+        except KeyError:
+            return build_error(msg_id, -32601, f"Unknown tool: {name}")
+    if method == "ping":
+        return build_response(msg_id, {})
 
-
-def handle_ping(msg_id, params: dict) -> None:
-    send_result(msg_id, {})
-
-
-REQUEST_HANDLERS = {
-    "initialize": handle_initialize,
-    "tools/list": handle_tools_list,
-    "tools/call": handle_tools_call,
-    "ping": handle_ping,
-}
+    return build_error(msg_id, -32601, f"Method not found: {method}")
 
 
 def main() -> None:
+    """stdio transport (functionality #5): one JSON-RPC message per line
+    on stdin, one JSON-RPC message per line on stdout."""
     for raw_line in sys.stdin:
         line = raw_line.strip()
         if not line:
@@ -248,23 +261,9 @@ def main() -> None:
         except json.JSONDecodeError:
             continue
 
-        method = message.get("method")
-        msg_id = message.get("id")
-        params = message.get("params") or {}
-
-        if method is None:
-            continue  # not a request/notification we understand
-
-        if msg_id is None:
-            # Notification (e.g. notifications/initialized): no response.
-            continue
-
-        handler = REQUEST_HANDLERS.get(method)
-        if handler is None:
-            send_error(msg_id, -32601, f"Method not found: {method}")
-            continue
-
-        handler(msg_id, params)
+        response = handle_message(message)
+        if response is not None:
+            send(response)
 
 
 if __name__ == "__main__":
