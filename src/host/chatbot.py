@@ -63,6 +63,9 @@ def run_agent_turn(llm: AnthropicClient, session: SessionContext, mcp_manager: M
             )
         content = response.get("content", [])
         stop_reason = response.get("stop_reason")
+        usage = response.get("usage")
+        if usage:
+            print(ui.token_usage_line(usage))
 
         session.add_assistant_message(content)
 
