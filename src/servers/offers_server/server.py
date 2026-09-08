@@ -27,7 +27,8 @@ TOOLS = [
                 "category": {
                     "type": "string",
                     "description": "Categoría a filtrar (ej. electronica, comida, viajes, "
-                                    "ropa, tecnologia, hogar, entretenimiento, educacion). "
+                                    "ropa, tecnologia, hogar, entretenimiento, educacion, "
+                                    "salud, mascotas, belleza, automotriz, ninos, oficina). "
                                     "Opcional: si se omite, se listan todas.",
                 }
             },
