@@ -9,10 +9,10 @@ el SDK de Anthropic en ninguna parte del código propio del proyecto.
 
 > Estado: este checkpoint implementa las funcionalidades **1 a la 6**
 > del enunciado (núcleo del chatbot + los dos servidores MCP locales
-> oficiales + nuestro propio servidor MCP, tanto local como remoto). El
+> oficiales + nuestro propio servidor MCP, tanto local como remoto - el
+> servidor remoto ya está desplegado y respondiendo en producción). El
 > análisis con Wireshark y el informe final (funcionalidades 7-10)
-> todavía no forman parte de esta entrega: requieren una captura de red
-> real sobre un despliegue en la nube ya activo (ver "Roadmap" abajo).
+> todavía no forman parte de esta entrega (ver "Roadmap" abajo).
 
 ## Por qué "sin SDK"
 
