@@ -55,9 +55,25 @@ Deploying it (e.g. to Google Cloud Run):
 cd src/servers/offers_server
 docker build -t offers-mcp .
 docker run -p 8080:8080 -e MCP_AUTH_TOKEN=change-me offers-mcp   # test locally first
+docker inspect --format='{{.State.Health.Status}}' <container>   # -> healthy, via GET /health
 
 # then, once you have gcloud configured:
 ../../../scripts/deploy_offers_cloud_run.sh
+```
+
+It doesn't have to be Cloud Run specifically - the container is a
+plain, self-contained Docker image with no cloud-specific bits, so any
+Docker host works the same way. This project's own running instance is
+deployed to a personal Hetzner VPS, as a container completely
+independent from whatever else that machine runs (own port, own
+`docker run`, nothing shared, no changes to any other service on the
+host):
+
+```bash
+scp -r src/servers/offers_server user@your-server:/opt/offers-mcp
+ssh user@your-server "cd /opt/offers-mcp && docker build -t offers-mcp . && \
+  docker run -d --restart unless-stopped --name offers-mcp -p 8090:8080 \
+  -e MCP_AUTH_TOKEN=<token> offers-mcp"
 ```
 
 Point the chatbot at the deployed URL by setting, in `.env`:
