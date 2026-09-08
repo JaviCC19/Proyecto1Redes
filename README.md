@@ -198,12 +198,20 @@ independientemente de la integración con el LLM.
 python3 -m unittest discover -s tests -v
 ```
 
-`tests/` cubre, sin necesitar red ni API key: la ventana de historial
-de sesión (`test_context.py`), los breakpoints de prompt caching hacia
-Claude (`test_llm_client.py`, con `requests.post` interceptado) y el
-dispatch `handle_message()` + el scoring de `match_offers` del servidor
-de ofertas (`test_offers_server.py`). Todos con `unittest` de la
-librería estándar, sin `pytest` ni otra dependencia nueva.
+`tests/` (46 pruebas) cubre, sin necesitar API key de Anthropic:
+
+| Módulo | Qué prueba |
+|---|---|
+| `test_context.py` | ventana de historial de sesión (funcionalidad #2) |
+| `test_llm_client.py` | breakpoints de prompt caching hacia Claude (`requests.post` interceptado, sin red real) |
+| `test_offers_server.py` | dispatch `handle_message()` y scoring de `match_offers`, sin transporte |
+| `test_http_server.py` | el transporte HTTP real (funcionalidad #6): levanta un `ThreadingHTTPServer` local y le pega por HTTP de verdad, incluyendo el gate de `MCP_AUTH_TOKEN` |
+| `test_mcp_manager.py` | que `OFFERS_REMOTE_URL` cambie correctamente entre servidor local/remoto, y que `close_all()` no se detenga si un cliente falla al cerrar |
+| `test_ui.py` | los helpers de formato de terminal |
+| `test_env_loader.py` | el parser de `.env` |
+
+Todos con `unittest` de la librería estándar, sin `pytest` ni otra
+dependencia nueva.
 
 ## Logging
 
@@ -265,6 +273,10 @@ tests/
   test_context.py         # ventana de historial de sesión
   test_llm_client.py        # breakpoints de prompt caching
   test_offers_server.py       # dispatch MCP + scoring de match_offers
+  test_http_server.py           # transporte HTTP real (funcionalidad #6)
+  test_mcp_manager.py             # switch local/remoto + close_all()
+  test_ui.py                        # helpers de formato de terminal
+  test_env_loader.py                  # parser de .env
 logs/                 # creado en tiempo de ejecución (ignorado por git salvo esta carpeta)
 ```
 
