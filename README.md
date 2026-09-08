@@ -124,18 +124,23 @@ Al iniciar, el host lanza e inicializa los tres servidores MCP
 (`offers`, `fs`, `git`), imprime el handshake JSON-RPC en la consola,
 y te deja en un prompt de chat. Escribe `salir` para salir.
 
-Se crean automáticamente dos carpetas aisladas la primera vez que lo
-ejecutas (ambas ignoradas por git):
+Se crea automáticamente una carpeta aislada la primera vez que lo
+ejecutas (ignorada por git): `workspace/`. Es, a la vez, el único
+directorio que el servidor MCP de Filesystem tiene permitido tocar Y
+el repositorio al que está vinculado el servidor MCP de Git - **a
+propósito el mismo directorio para ambos**, así un archivo que el
+modelo acaba de escribir con `fs__write_file` ya está ahí para que
+`git__git_add` / `git__git_commit` lo vean (si fueran dos directorios
+distintos, "crea un README y haz commit" terminaría comiteando
+cualquier archivo que ya existiera en el repo git, no el que se acaba
+de crear - así se descubrió y arregló este bug).
 
-- `workspace/` - el único directorio que el servidor MCP de Filesystem
-  tiene permitido tocar.
-- `workspace_git/` - el repositorio al que está vinculado el servidor
-  MCP de Git. Se inicializa con un único `git init` la primera vez (el
-  paquete oficial `mcp-server-git` no expone una herramienta
-  `git_init` y se niega a iniciar si `--repository` no apunta ya a un
-  repositorio válido - ver el comentario en `mcp_manager.py` para más
-  detalles). Cada operación posterior (crear el README, añadirlo,
-  hacer commit) pasa por MCP.
+`workspace/` se inicializa con un único `git init` la primera vez (el
+paquete oficial `mcp-server-git` no expone una herramienta `git_init`
+y se niega a iniciar si `--repository` no apunta ya a un repositorio
+válido - ver el comentario en `mcp_manager.py` para más detalles).
+Cada operación posterior (crear el README, añadirlo, hacer commit)
+pasa por MCP.
 
 ### Escenario de demostración para la funcionalidad #4
 

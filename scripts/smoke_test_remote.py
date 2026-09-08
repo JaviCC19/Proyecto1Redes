@@ -44,9 +44,12 @@ def main() -> None:
         print(f"[smoke] using OFFERS_REMOTE_URL={remote_url}")
 
     try:
+        # fs/git are disabled below (this script only exercises the offers
+        # transport), but they'd share one sandbox dir if enabled - see
+        # chatbot.py's WORKSPACE_DIR/GIT_REPO_DIR comment.
+        sandbox_dir = os.path.join(ROOT, "workspace")
         logger = InteractionLogger(log_dir=os.path.join(ROOT, "logs"), echo_to_console=False)
-        mgr = MCPManager(logger=logger, workspace_dir=os.path.join(ROOT, "workspace"),
-                          git_repo_dir=os.path.join(ROOT, "workspace_git"))
+        mgr = MCPManager(logger=logger, workspace_dir=sandbox_dir, git_repo_dir=sandbox_dir)
         mgr.start_all(include_fs=False, include_git=False, include_offers=True)
 
         assert "offers" in mgr.clients, "offers client did not connect"

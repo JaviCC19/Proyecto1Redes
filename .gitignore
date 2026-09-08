@@ -11,7 +11,6 @@ venv/
 logs/*.log
 logs/sessions/
 workspace/
-workspace_git/
 
 # OS
 .DS_Store
