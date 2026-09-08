@@ -89,5 +89,29 @@ class TestStartOffers(unittest.TestCase):
         self.assertIs(mgr.clients["offers"], client)
 
 
+class _RaisingClient:
+    def close(self):
+        raise RuntimeError("boom")
+
+
+class _RecordingClient:
+    def __init__(self):
+        self.closed = False
+
+    def close(self):
+        self.closed = True
+
+
+class TestCloseAll(unittest.TestCase):
+    def test_one_client_raising_does_not_stop_the_others_from_closing(self) -> None:
+        mgr = mcp_manager.MCPManager(logger=object(), workspace_dir="/tmp/ws", git_repo_dir="/tmp/git")
+        good = _RecordingClient()
+        mgr.clients = {"bad": _RaisingClient(), "good": good}
+
+        mgr.close_all()  # must not raise
+
+        self.assertTrue(good.closed)
+
+
 if __name__ == "__main__":
     unittest.main()

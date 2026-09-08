@@ -118,5 +118,12 @@ class MCPManager:
         return client.call_tool(tool_name, arguments)
 
     def close_all(self) -> None:
-        for client in self.clients.values():
-            client.close()
+        # Best-effort: one server misbehaving on shutdown (e.g. the fs
+        # server already exited, or the HTTP client's session hitting a
+        # closed remote connection) must not stop the others from being
+        # cleaned up too.
+        for alias, client in self.clients.items():
+            try:
+                client.close()
+            except Exception as exc:  # noqa: BLE001
+                print(f"[warn] error closing '{alias}': {exc}", file=sys.stderr)
