@@ -85,6 +85,24 @@ def success(text: str) -> str:
     return _c(f"✓ {text}", Color.GREEN)
 
 
+def token_usage_line(usage: dict) -> str:
+    """One-line summary of an Anthropic API response's `usage` block,
+    highlighting prompt-cache hits (see llm_client._with_cache_breakpoint)
+    so the token-optimization work is visible turn by turn instead of
+    invisible in a dashboard somewhere."""
+    fresh_in = usage.get("input_tokens", 0)
+    cache_read = usage.get("cache_read_input_tokens", 0)
+    cache_write = usage.get("cache_creation_input_tokens", 0)
+    out = usage.get("output_tokens", 0)
+    parts = [f"in={fresh_in}"]
+    if cache_read:
+        parts.append(_c(f"cache_hit={cache_read}", Color.GREEN))
+    if cache_write:
+        parts.append(_c(f"cache_write={cache_write}", Color.DIM))
+    parts.append(f"out={out}")
+    return _c("  ↳ tokens: ", Color.DIM) + " ".join(parts)
+
+
 def tool_call_line(server_alias: str, tool_name: str, arguments: dict) -> str:
     args_preview = ", ".join(f"{k}={v!r}" for k, v in list(arguments.items())[:3])
     if len(arguments) > 3:
