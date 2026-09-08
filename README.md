@@ -190,13 +190,50 @@ escribir+leer un archivo, init/add/commit/status de un repositorio
 git) — útil para confirmar que el transporte funciona
 independientemente de la integración con el LLM.
 
+## Pruebas unitarias
+
+```bash
+./scripts/run_tests.sh
+# o directamente:
+python3 -m unittest discover -s tests -v
+```
+
+`tests/` cubre, sin necesitar red ni API key: la ventana de historial
+de sesión (`test_context.py`), los breakpoints de prompt caching hacia
+Claude (`test_llm_client.py`, con `requests.post` interceptado) y el
+dispatch `handle_message()` + el scoring de `match_offers` del servidor
+de ofertas (`test_offers_server.py`). Todos con `unittest` de la
+librería estándar, sin `pytest` ni otra dependencia nueva.
+
 ## Logging
 
 Cada solicitud, respuesta y notificación JSON-RPC es:
 
 - impresa en la consola como `[MCP][<server>] --> / <-- id=... ...`
+  (coloreada por dirección: amarillo=solicitud, verde=respuesta,
+  rojo=error - ver `src/host/logger.py` / `src/host/ui.py`)
 - agregada como una línea JSON estructurada a
   `logs/mcp_interactions.log`
+
+## Optimización de tokens
+
+El chatbot usa `claude-haiku-4-5-20251001` por defecto (overridable con
+`ANTHROPIC_MODEL` en `.env`), y dos optimizaciones en cómo se le habla
+a la API de Anthropic (ver `src/host/llm_client.py` / `context.py`):
+
+- **Prompt caching**: el prompt de sistema, el listado de herramientas
+  y el prefijo de la conversación se marcan con `cache_control:
+  {"type": "ephemeral"}`. Como la API de Messages es sin estado y cada
+  turno reenvía todo el historial, sin esto se reprocesaría como
+  tokens nuevos en cada mensaje - con esto, Anthropic reutiliza el
+  prefijo cacheado y solo cobra/procesa lo realmente nuevo. Cada turno
+  imprime en consola cuántos tokens vinieron de caché
+  (`ui.token_usage_line`).
+- **Ventana de historial acotada**: `SessionContext.as_api_messages()`
+  solo reenvía las últimas `max_history_turns` (20 por defecto) turnos
+  humanos a la API, en vez de una conversación completa que crece sin
+  límite. El historial completo se sigue guardando en memoria y en
+  disco (`logs/sessions/`) para no perder nada.
 
 ## Estructura del proyecto
 
@@ -220,9 +257,14 @@ src/
       README.md            # especificación del protocolo, herramientas, ejemplos de uso
 scripts/
   run_chatbot.sh
+  run_tests.sh              # corre tests/ (unittest, sin pytest)
   smoke_test.py
   smoke_test_remote.py  # verifica el transporte HTTP de punta a punta
   deploy_offers_cloud_run.sh  # despliega http_server.py a Google Cloud Run
+tests/
+  test_context.py         # ventana de historial de sesión
+  test_llm_client.py        # breakpoints de prompt caching
+  test_offers_server.py       # dispatch MCP + scoring de match_offers
 logs/                 # creado en tiempo de ejecución (ignorado por git salvo esta carpeta)
 ```
 
